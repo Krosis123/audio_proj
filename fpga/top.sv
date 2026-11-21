@@ -17,6 +17,15 @@ module top (
     logic [15:0] rd_data;
     logic wr_en, rd_en;
 
+    // entropy stuff
+    logic [19:0] entropy_fixed;
+    logic [19:0] entropy_reg;
+    logic entropy_valid;
+    logic entropy_start;
+
+    logic [7:0] entropy_read_index;
+    logic [7:0] histogram_read_addr;
+
     // Energy and zero-crossing statistics
     logic [39:0] energy, energy_reg;
     logic energy_valid;
@@ -38,18 +47,22 @@ module top (
     logic [7:0] tx_data;
     logic tx_send, tx_busy;
     logic tx_half;
-    logic [2:0] energy_index;
+    logic [3:0] energy_index;
 
-    typedef enum logic [2:0] {
-        COLLECT,
-        WAIT_ENERGY,
-        WAIT_HIST,
-        READ_REQ,
-        READ_WAIT,
-        START_TX,
-        WAIT_TX_BUSY,
-        WAIT_TX_DONE
-    } state_t;
+
+typedef enum logic [3:0] {
+    COLLECT,
+    WAIT_ENERGY,
+    WAIT_HIST,
+    ENTROPY_START,
+    WAIT_ENTROPY,
+    READ_REQ,
+    READ_WAIT,
+    START_TX,
+    WAIT_TX_BUSY,
+    WAIT_TX_DONE
+} state_t;
+
 
     state_t state;
 

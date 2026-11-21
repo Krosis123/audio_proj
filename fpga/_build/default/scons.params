@@ -1,4 +1,4 @@
-timestamp: "22031113814"
+timestamp: "22031217087"
 fpga_definition {
   arch: xilinx
   vendor_part: "XC7A100T-1CSG324"
@@ -8,11 +8,6 @@ fpga_definition {
     yosys_family: "artix7"
     nextpnr_device: "xc7a100tcsg324-1"
   }
-}
-verbosity {
-  all: false
-  synth: false
-  pnr: false
 }
 environment {
   platform_id: "windows-amd64"
@@ -47,4 +42,9 @@ apio_env_params {
   env_name: "default"
   board_id: "nexys-a7-100t"
   top_module: "top"
+}
+target {
+  upload {
+    programmer_cmd: "openFPGALoader --force-terminal-mode --verify --board nexys_a7_100 $SOURCE"
+  }
 }
