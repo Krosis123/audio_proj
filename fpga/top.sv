@@ -55,6 +55,25 @@ module top (
     assign wr_en = (state == COLLECT) && sample_valid;
     assign rd_en = (state == READ_REQ);
 
+
+
+
+exact_histogram histogram (
+    .clk(clk),
+    .reset_n(cpu_resetn),
+
+    .sample_in(sample),
+    .sample_valid(wr_en),
+
+    .read_index(histogram_read_index),
+    .read_value(histogram_read_value),
+    .read_count(histogram_read_count),
+
+    .unique_count(histogram_unique_count),
+    .hist_done(histogram_done),
+    .ready(histogram_ready)
+);
+
     uart_rx receiver (
         .clk(clk),
         .reset_n(cpu_resetn),
