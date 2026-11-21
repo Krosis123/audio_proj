@@ -3,7 +3,7 @@ import serial
 import struct
 import random
 # MEOWWWW
-PORT = "COM6"
+PORT = "COM5"
 BLOCK_SIZE = 256
 
 rng = random.Random(67)

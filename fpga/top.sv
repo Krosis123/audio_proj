@@ -12,6 +12,16 @@ module top (
     logic signed [15:0] sample;
     logic sample_valid;
 
+
+    logic [8:0] histogram_unique_count;
+    logic histogram_done;
+    logic histogram_ready;
+
+    logic [7:0] histogram_read_index;
+    logic [15:0] histogram_read_value;
+    logic [8:0] histogram_read_count;
+
+
     logic [7:0] wr_addr, rd_addr;
     logic [15:0] rd_data;
     logic wr_en, rd_en;

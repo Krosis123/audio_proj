@@ -1,0 +1,2 @@
+`verilator_config
+lint_off -rule SPECIFYIGN  -file "C:\\Users\\usman\\.apio\\packages\\oss-cad-suite\\share\\yosys\\xilinx\\*"
