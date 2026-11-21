@@ -6,115 +6,155 @@ module exact_histogram (
     input  logic [15:0] sample_in,
     input  logic sample_valid,
 
-    // Read an entry from the histogram
     input  logic [7:0] read_index,
     output logic [15:0] read_value,
     output logic [8:0] read_count,
 
-    // Information about the histogram
     output logic [8:0] unique_count,
     output logic hist_done,
     output logic ready
 );
 
-    // Up to 256 unique sample values
     logic [15:0] values [0:255];
-
-    // Frequency of each value
     logic [8:0] counts [0:255];
 
     logic [7:0] sample_count;
     logic [7:0] search_index;
     logic [15:0] target_sample;
 
+    logic [7:0] mem_addr;
+    logic [15:0] mem_value_q;
+    logic [8:0] mem_count_q;
+
+    logic mem_we;
+    logic [7:0] mem_wr_addr;
+    logic [15:0] mem_wr_value;
+    logic [8:0] mem_wr_count;
+
     typedef enum logic [1:0] {
         IDLE,
-        SEARCH,
+        SEARCH_READ,
+        SEARCH_CHECK,
         COMMIT
     } state_t;
 
     state_t state;
 
-    // External read interface
-    assign read_value = values[read_index];
-    assign read_count = counts[read_index];
+    logic match_found;
+    logic last_entry;
 
     assign ready = (state == IDLE);
+
+    assign match_found =
+        (mem_value_q == target_sample);
+
+    assign last_entry =
+        ({1'b0, search_index} + 9'd1 == unique_count);
+
+    // One shared synchronous read port
+    assign mem_addr =
+        (state == SEARCH_READ ||
+         state == SEARCH_CHECK)
+        ? search_index : read_index;
+
+    assign read_value = mem_value_q;
+    assign read_count = mem_count_q;
+
+    // Generate memory write controls
+    always_comb begin
+        mem_we = 1'b0;
+        mem_wr_addr = 0;
+        mem_wr_value = 0;
+        mem_wr_count = 0;
+
+        if (state == IDLE &&
+            sample_valid &&
+            sample_count == 0) begin
+
+            mem_we = 1'b1;
+            mem_wr_addr = 0;
+            mem_wr_value = sample_in;
+            mem_wr_count = 9'd1;
+        end
+        else if (state == SEARCH_CHECK) begin
+
+            if (match_found) begin
+                mem_we = 1'b1;
+                mem_wr_addr = search_index;
+                mem_wr_value = target_sample;
+                mem_wr_count = mem_count_q + 9'd1;
+            end
+            else if (last_entry) begin
+                mem_we = 1'b1;
+                mem_wr_addr = unique_count[7:0];
+                mem_wr_value = target_sample;
+                mem_wr_count = 9'd1;
+            end
+        end
+    end
+
+    // Synchronous memory access
+    always_ff @(posedge clk) begin
+        mem_value_q <= values[mem_addr];
+        mem_count_q <= counts[mem_addr];
+
+        if (mem_we) begin
+            values[mem_wr_addr] <= mem_wr_value;
+            counts[mem_wr_addr] <= mem_wr_count;
+        end
+    end
 
     always_ff @(posedge clk or negedge reset_n) begin
         if (!reset_n) begin
             state <= IDLE;
-
             sample_count <= 0;
             search_index <= 0;
             target_sample <= 0;
-
             unique_count <= 0;
             hist_done <= 0;
         end
         else begin
+
             case (state)
 
                 IDLE: begin
                     if (sample_valid) begin
 
                         if (sample_count == 0) begin
-                            // Start a new block
-                            values[0] <= sample_in;
-                            counts[0] <= 9'd1;
-
                             unique_count <= 9'd1;
                             sample_count <= 8'd1;
                             hist_done <= 0;
                         end
                         else begin
-                            // Search existing entries
                             target_sample <= sample_in;
                             search_index <= 0;
-                            state <= SEARCH;
+                            state <= SEARCH_READ;
                         end
                     end
                 end
 
-                SEARCH: begin
+                SEARCH_READ: begin
+                    state <= SEARCH_CHECK;
+                end
 
-                    if (values[search_index] ==
-                        target_sample) begin
-
-                        // Existing value: increase count
-                        counts[search_index] <=
-                            counts[search_index] + 9'd1;
-
+                SEARCH_CHECK: begin
+                    if (match_found) begin
                         state <= COMMIT;
                     end
-
-                    else if (
-                        {1'b0, search_index} + 9'd1
-                        == unique_count
-                    ) begin
-
-                        // No match: create a new entry
-                        values[unique_count[7:0]]
-                            <= target_sample;
-
-                        counts[unique_count[7:0]]
-                            <= 9'd1;
-
+                    else if (last_entry) begin
                         unique_count <= unique_count + 9'd1;
-
                         state <= COMMIT;
                     end
-
                     else begin
                         search_index <= search_index + 1'b1;
+                        state <= SEARCH_READ;
                     end
                 end
 
                 COMMIT: begin
                     if (sample_count == 8'd255) begin
-                        // 256th sample completed
                         sample_count <= 0;
-                        hist_done <= 1;
+                        hist_done <= 1'b1;
                     end
                     else begin
                         sample_count <= sample_count + 1'b1;

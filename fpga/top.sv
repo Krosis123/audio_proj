@@ -308,9 +308,9 @@ module top (
                                 else begin
                                     hist_index <= hist_index + 1'b1;
                                     hist_byte_index <= 0;
-                                    state <= START_TX;
+                                    state <= READ_WAIT;
                                 end
-                            end
+                            end 
 
                             default: state <= COLLECT;
 
