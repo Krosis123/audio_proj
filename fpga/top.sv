@@ -126,17 +126,42 @@ typedef enum logic [3:0] {
     );
 
     exact_histogram histogram (
+
+    assign entropy_start = (state == ENTROPY_START);
+
+    assign histogram_read_addr =
+        (state == ENTROPY_START ||
+        state == WAIT_ENTROPY)
+        ? entropy_read_index
+        : hist_index;
         .clk(clk),
         .reset_n(cpu_resetn),
         .sample_in(sample),
         .sample_valid(wr_en),
-        .read_index(hist_index),
+        .read_index(histogram_read_addr),
         .read_value(hist_value),
         .read_count(hist_count),
         .unique_count(hist_unique_count),
         .hist_done(hist_done),
         .ready()
     );
+
+
+
+    entropy_calc entropy_unit (
+        .clk(clk),
+        .reset_n(cpu_resetn),
+
+        .start(entropy_start),
+        .unique_count(unique_count_reg),
+
+        .read_index(entropy_read_index),
+        .read_count(hist_count),
+
+        .entropy_q16(entropy_fixed),
+        .entropy_valid(entropy_valid)
+    );
+
 
     uart_tx transmitter (
         .clk(clk),
