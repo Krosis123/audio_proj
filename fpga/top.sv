@@ -125,26 +125,28 @@ typedef enum logic [3:0] {
         .zcr_valid(zcr_valid)
     );
 
-    exact_histogram histogram (
 
-    assign entropy_start = (state == ENTROPY_START);
+assign entropy_start = (state == ENTROPY_START);
 
-    assign histogram_read_addr =
-        (state == ENTROPY_START ||
-        state == WAIT_ENTROPY)
-        ? entropy_read_index
-        : hist_index;
-        .clk(clk),
-        .reset_n(cpu_resetn),
-        .sample_in(sample),
-        .sample_valid(wr_en),
-        .read_index(histogram_read_addr),
-        .read_value(hist_value),
-        .read_count(hist_count),
-        .unique_count(hist_unique_count),
-        .hist_done(hist_done),
-        .ready()
-    );
+assign histogram_read_addr =
+    (state == ENTROPY_START ||
+     state == WAIT_ENTROPY)
+    ? entropy_read_index
+    : hist_index;
+
+exact_histogram histogram (
+    .clk(clk),
+    .reset_n(cpu_resetn),
+    .sample_in(sample),
+    .sample_valid(wr_en),
+    .read_index(histogram_read_addr),
+    .read_value(hist_value),
+    .read_count(hist_count),
+    .unique_count(hist_unique_count),
+    .hist_done(hist_done),
+    .ready()
+);
+
 
 
 
@@ -178,7 +180,7 @@ typedef enum logic [3:0] {
             phase <= PH_AUDIO;
             wr_addr <= 0;
             rd_addr <= 0;
-
+            entropy_reg <= 20'd0;
             tx_data <= 0;
             tx_send <= 0;
             tx_half <= 0;
@@ -213,15 +215,30 @@ typedef enum logic [3:0] {
                     end
                 end
 
+
                 WAIT_HIST: begin
                     if (hist_done) begin
                         unique_count_reg <= hist_unique_count;
+                        state <= ENTROPY_START;
+                    end
+                end
+
+                ENTROPY_START: begin
+                    state <= WAIT_ENTROPY;
+                end
+
+                WAIT_ENTROPY: begin
+                    if (entropy_valid) begin
+                        entropy_reg <= entropy_fixed;
+
                         phase <= PH_AUDIO;
                         rd_addr <= 0;
                         tx_half <= 0;
+
                         state <= READ_REQ;
                     end
                 end
+
 
                 READ_REQ: begin
                     state <= READ_WAIT;
@@ -241,17 +258,27 @@ typedef enum logic [3:0] {
                                     rd_data[7:0];
                             end
 
+
                             PH_STATS: begin
                                 case (energy_index)
-                                    3'd0: tx_data <= energy_reg[7:0];
-                                    3'd1: tx_data <= energy_reg[15:8];
-                                    3'd2: tx_data <= energy_reg[23:16];
-                                    3'd3: tx_data <= energy_reg[31:24];
-                                    3'd4: tx_data <= energy_reg[39:32];
-                                    3'd5: tx_data <= zcr_reg;
-                                    default: tx_data <= 0;
+
+                                    4'd0: tx_data <= energy_reg[7:0];
+                                    4'd1: tx_data <= energy_reg[15:8];
+                                    4'd2: tx_data <= energy_reg[23:16];
+                                    4'd3: tx_data <= energy_reg[31:24];
+                                    4'd4: tx_data <= energy_reg[39:32];
+
+                                    4'd5: tx_data <= zcr_reg;
+
+                                    4'd6: tx_data <= entropy_reg[7:0];
+                                    4'd7: tx_data <= entropy_reg[15:8];
+                                    4'd8: tx_data <= {4'b0, entropy_reg[19:16]};
+
+                                    default: tx_data <= 8'd0;
+
                                 endcase
                             end
+
 
                             PH_COUNT: begin
                                 tx_data <= tx_half ?
@@ -303,7 +330,7 @@ typedef enum logic [3:0] {
                             end
 
                             PH_STATS: begin
-                                if (energy_index == 3'd5) begin
+                                if (energy_index == 4'd8) begin
                                     phase <= PH_COUNT;
                                     tx_half <= 0;
                                 end
