@@ -145,44 +145,64 @@ with serial.Serial(PORT, BAUD, timeout=5) as fpga:
 
         fpga_hist = dict(entries)
 
+        # Debug histogram before assertions
+        print("\n--- HISTOGRAM DEBUG ---")
+        print("Test:", name)
+        print("Expected unique values:", len(expected_hist))
+        print("FPGA unique_count:", unique_count)
+        print("Received entries:", len(entries))
+        print("Distinct received values:", len(fpga_hist))
+        print("Sum of frequencies:", sum(c for _, c in entries))
+
+        value_frequency = Counter(v for v, c in entries)
+
+        duplicates = [
+            (value, frequency)
+            for value, frequency in value_frequency.items()
+            if frequency > 1
+        ]
+
+        print("Duplicate values:", duplicates[:10])
+        print("First 10 entries:", entries[:10])
+        print("Last 10 entries:", entries[-10:])
+
+        if name == "All unique":
+            incorrect = [
+                (i, value, count, samples[i])
+                for i, (value, count) in enumerate(entries)
+                if value != samples[i] or count != 1
+            ]
+
+            print("First incorrect entries:", incorrect[:10])
+
+        print("-----------------------\n")
+
         # Verify original audio
-        assert list(recovered) == samples, (
-            "Audio mismatch"
-        )
+        assert list(recovered) == samples, "Audio mismatch"
 
         # Verify energy
-        assert fpga_energy == expected_energy, (
-            "Energy mismatch"
-        )
+        assert fpga_energy == expected_energy, "Energy mismatch"
 
         # Verify ZCR
-        assert zcr_byte == expected_zcr, (
-            "ZCR mismatch"
-        )
+        assert zcr_byte == expected_zcr, "ZCR mismatch"
 
         # Verify histogram
-        assert len(fpga_hist) == unique_count
-        assert sum(fpga_hist.values()) == 256
+        assert len(fpga_hist) == unique_count, (
+            "Duplicate histogram values detected"
+        )
 
-        print("\n--- HISTOGRAM DEBUG ---")
-        print("Unique count:", unique_count)
-        print("Expected histogram:", expected_hist)
-        print("FPGA histogram:", fpga_hist)
-        print("Raw histogram bytes:", histogram_bytes.hex(" "))
-        print("Entropy bytes:", entropy_bytes.hex(" "))
-        print("FPGA entropy:", fpga_entropy)
-        print("-----------------------\n")
+        assert sum(fpga_hist.values()) == 256, (
+            "Histogram frequency sum mismatch"
+        )
 
         assert fpga_hist == expected_hist, (
             "Histogram mismatch"
         )
 
-
-        # Verify entropy against the exact
-        # rounded lookup-table reference
-        print(f"  Python entropy: {expected_entropy:.6f}")
-        print(f"  FPGA entropy:   {fpga_entropy:.6f}")
-        print(f"  Unique values:  {unique_count}")
+        # Verify entropy
+        print(f"Python entropy: {expected_entropy:.6f}")
+        print(f"FPGA entropy:   {fpga_entropy:.6f}")
+        print(f"Unique values:  {unique_count}")
 
         assert fpga_entropy_fixed == expected_fixed, (
             f"Entropy mismatch: "
@@ -190,11 +210,8 @@ with serial.Serial(PORT, BAUD, timeout=5) as fpga:
             f"expected={expected_fixed}"
         )
 
-        print("  Audio:      PASS")
-        print("  Energy:     PASS")
-        print("  ZCR:        PASS")
-        print("  Histogram:  PASS")
-        print("  Entropy:    PASS")
-
-
-print("\nALL TESTS PASSED")
+        print("Audio:      PASS")
+        print("Energy:     PASS")
+        print("ZCR:        PASS")
+        print("Histogram:  PASS")
+        print("Entropy:    PASS")
