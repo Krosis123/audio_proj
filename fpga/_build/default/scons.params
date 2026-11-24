@@ -1,4 +1,4 @@
-timestamp: "25011243599"
+timestamp: "25020756428"
 fpga_definition {
   arch: xilinx
   vendor_part: "XC7A100T-1CSG324"
@@ -44,7 +44,10 @@ apio_env_params {
   top_module: "top"
 }
 target {
-  upload {
-    programmer_cmd: "openFPGALoader --force-terminal-mode --verify --board nexys_a7_100 $SOURCE"
+  sim {
+    testbench_path: "tests/aes128_tb.sv"
+    force_sim: false
+    no_gtkwave: true
+    detach_gtkwave: false
   }
 }

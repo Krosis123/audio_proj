@@ -1,7 +1,7 @@
-"""Stream a 16-bit PCM WAV through the Nexys4 DDR audio statistics pipeline.
+"""Stream a WAV through FPGA affine scramble + FPGA inverse + audio statistics.
 
 FPGA response, per 256 signed samples (little-endian):
-  512 bytes echoed PCM
+  512 bytes FPGA-restored PCM (scramble then inverse in hardware)
     5 bytes energy (unsigned)
     1 byte  zero crossing count
     3 bytes Q16 Shannon entropy (unsigned)
@@ -124,12 +124,14 @@ def run(args):
             raise ValueError("This script supports mono or stereo WAV only")
 
         frames_per_block = BLOCK_SAMPLES // channels
-        block_total = (frame_total + frames_per_block - 1) // frames_per_block
+        full_block_total = (frame_total + frames_per_block - 1) // frames_per_block
+        block_total = (min(full_block_total, args.max_blocks)
+                       if args.max_blocks is not None else full_block_total)
         duration = frame_total / sample_rate
 
         print(
             f"Input: {source} | {duration:.2f}s | {sample_rate} Hz | "
-            f"{channels} channel(s) | {block_total} FPGA blocks"
+            f"{channels} channel(s) | {block_total}/{full_block_total} FPGA blocks"
         )
         print(f"Serial: {args.port} @ {args.baud} baud")
         print(f"Output: {destination} | Report: {report}")
@@ -196,7 +198,10 @@ def run(args):
     print(f"Bit-exact PCM match:   {identical}")
     if not identical:
         raise AssertionError("Recovered audio samples differ from input")
-    print("SUCCESS: every FPGA block and the complete recovered PCM stream match")
+    if args.max_blocks is not None and block_total < full_block_total:
+        print("SUCCESS: tested WAV prefix recovered bit-exactly on the FPGA")
+    else:
+        print("SUCCESS: every FPGA block and the complete recovered PCM stream match")
 
 
 def main():
@@ -208,9 +213,13 @@ def main():
     parser.add_argument("--baud", type=int, default=921600)
     parser.add_argument("--timeout", type=float, default=5.0)
     parser.add_argument("--progress", type=int, default=25, help="Print progress every N blocks")
+    parser.add_argument("--max-blocks", type=int, default=None,
+                        help="Process only the first N blocks for a quick test")
     args = parser.parse_args()
     if args.progress <= 0:
         parser.error("--progress must be positive")
+    if args.max_blocks is not None and args.max_blocks <= 0:
+        parser.error("--max-blocks must be positive")
     run(args)
 
 

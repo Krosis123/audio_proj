@@ -1,0 +1,17 @@
+[*] GTKWave display configuration for 'apio sim tests/aes128_tb.sv'
+[*] THIS FILE WAS GENERATED AUTOMATICALLY BY APIO.
+[*] DO NOT EDIT IT MANUALLY!
+[*] To customize this file, run 'apio sim tests/aes128_tb.sv'
+[*] and save the file from GTKWave.
+
+[*] GTKWave Analyzer v3.4.0 (w)1999-2022 BSI
+
+[*]
+aes128_tb.busy
+aes128_tb.ciphertext[127:0]
+aes128_tb.clk
+aes128_tb.done
+aes128_tb.key[127:0]
+aes128_tb.plaintext[127:0]
+aes128_tb.reset_n
+aes128_tb.start
