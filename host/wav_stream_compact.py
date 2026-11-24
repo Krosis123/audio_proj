@@ -5,11 +5,14 @@ FPGA response, per 256 signed samples (little-endian):
     5 bytes energy (unsigned)
     1 byte  zero crossing count
     3 bytes Q16 Shannon entropy (unsigned)
-    2 bytes number of exact histogram entries, K (unsigned)
-  4*K bytes of histogram (each: signed 16-bit value, unsigned 16-bit count)
+    2 bytes number of distinct sample values, K (unsigned)
+
+The exact histogram remains inside the FPGA for entropy calculation;
+it is not transmitted to the host.
 
 The last block is padded with zeros for the FPGA but padding is removed
-when writing the reconstructed WAV. Verifies each returned block completely.
+when writing the reconstructed WAV. Verifies PCM, energy, ZCR, entropy, and
+unique-value count against Python calculations for each block.
 """
 
 import argparse
@@ -79,26 +82,23 @@ def process_block(port: serial.Serial, samples: list[int], block_number: int):
             f"Block {block_number}: invalid unique count {unique_count}"
         )
 
-    histogram_bytes = read_exact(port, unique_count * 4)
-    entries = list(struct.iter_unpack("<hH", histogram_bytes))
-    hist_out = dict(entries)
-
+    # Histogram entries stay inside the FPGA. Validate the final
+    # statistics against an exact-value Counter constructed in Python.
     checks = {
         "audio": audio_out == struct.pack("<256h", *samples),
         "energy": energy == expected_energy,
         "zcr": zcr == expected_zcr,
-        "histogram_count": len(entries) == len(hist_out) == unique_count,
-        "histogram": hist_out == expected_hist,
+        "unique_count": unique_count == len(expected_hist),
         "entropy": entropy_fixed == expected_entropy_fixed,
     }
     failed = [name for name, ok in checks.items() if not ok]
     if failed:
         raise AssertionError(
             f"Block {block_number}: failed {', '.join(failed)}; "
-            f"K={unique_count}, energy={energy}/{expected_energy}, "
+            f"K={unique_count}/{len(expected_hist)}, "
+            f"energy={energy}/{expected_energy}, "
             f"ZCR={zcr}/{expected_zcr}, "
-            f"H_Q16={entropy_fixed}/{expected_entropy_fixed}, "
-            f"histogram-first={entries[:5]}"
+            f"H_Q16={entropy_fixed}/{expected_entropy_fixed}"
         )
 
     return audio_out, energy, zcr, entropy_fixed / ENTROPY_SCALE, unique_count
@@ -205,7 +205,7 @@ def main():
     parser.add_argument("--output", default="recovered.wav", help="Recovered WAV filename")
     parser.add_argument("--csv", default="audio_stats.csv", help="Per-block statistics CSV")
     parser.add_argument("--port", default="COM5", help="UART port (default: COM5)")
-    parser.add_argument("--baud", type=int, default=115200)
+    parser.add_argument("--baud", type=int, default=921600)
     parser.add_argument("--timeout", type=float, default=5.0)
     parser.add_argument("--progress", type=int, default=25, help="Print progress every N blocks")
     args = parser.parse_args()
