@@ -6,7 +6,7 @@ import math
 from collections import Counter
 
 PORT = "COM5"
-BAUD = 115200
+BAUD = 921600
 BLOCK_SIZE = 256
 SCALE = 1 << 16
 
